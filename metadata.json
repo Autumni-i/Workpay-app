@@ -1,0 +1,6 @@
+{
+  "name": "WorkPay",
+  "description": "Track work shifts, calculate part-time salary, and export to Excel and Google Workspace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

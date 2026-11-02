@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preferences for the application",
+      "type": "object",
+      "properties": {
+        "defaultHourlyRate": { "type": "number", "description": "Default hourly wage" },
+        "currency": { "type": "string", "enum": ["VND", "USD", "EUR"] },
+        "nightShiftBonusType": { "type": "string", "enum": ["percent", "fixed"] },
+        "nightShiftBonusValue": { "type": "number" },
+        "nightShiftBonusPercent": { "type": "number" },
+        "shiftColor": { "type": "string", "maxLength": 20 },
+        "googleEventColor": { "type": "string", "maxLength": 20 },
+        "autoSyncGoogleCalendar": { "type": "boolean" },
+        "defaultHolidayMultiplier": { "type": "number", "description": "Default holiday multiplier (e.g. 3 for x3 salary)" },
+        "autoDetectHolidays": { "type": "boolean", "description": "Auto detect Vietnamese public holidays" },
+        "shiftTemplates": { "type": "array" },
+        "expenseCategories": { "type": "array" },
+        "accounts": { "type": "array" },
+        "updatedAt": { "type": "string", "description": "Timestamp of last update" }
+      },
+      "required": ["defaultHourlyRate", "currency", "updatedAt"]
+    },
+    "Shift": {
+      "title": "Shift",
+      "description": "A recorded work shift",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "startTime": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}$" },
+        "endTime": { "type": "string", "pattern": "^[0-9]{2}:[0-9]{2}$" },
+        "hourlyRate": { "type": "number", "description": "Hourly rate" },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "hoursWorked": { "type": "number" },
+        "regularHours": { "type": "number" },
+        "bonusHours": { "type": "number" },
+        "totalPay": { "type": "number" },
+        "isHoliday": { "type": "boolean", "description": "Whether shift falls on a holiday" },
+        "holidayMultiplier": { "type": "number", "description": "Salary multiplier (e.g. 1.5, 2, 3, 4)" },
+        "holidayName": { "type": "string", "maxLength": 100, "description": "Name of public holiday" },
+        "color": { "type": "string", "maxLength": 20 },
+        "googleEventId": { "type": "string", "maxLength": 256 },
+        "syncedToCalendar": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["date", "startTime", "endTime", "hourlyRate", "hoursWorked", "totalPay", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A recorded financial transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "type": { "type": "string", "enum": ["income", "expense"] },
+        "amount": { "type": "number" },
+        "category": { "type": "string", "maxLength": 100 },
+        "account": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["date", "type", "amount", "description", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "User settings document."
+    },
+    "users/{userId}/shifts/{shiftId}": {
+      "schema": { "$ref": "#/entities/Shift" },
+      "description": "Work shifts logged by the user."
+    },
+    "users/{userId}/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Financial transactions logged by the user."
+    }
+  }
+}

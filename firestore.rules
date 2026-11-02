@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Primitive Definition
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+
+    // Blueprint Validators
+    function isValidUserSettings(data) {
+      return data.keys().hasAll(['defaultHourlyRate', 'currency', 'updatedAt']) &&
+             data.defaultHourlyRate is number &&
+             data.currency is string && data.currency in ['VND', 'USD', 'EUR'] &&
+             (!('shiftTemplates' in data) || data.shiftTemplates is list) &&
+             (!('expenseCategories' in data) || data.expenseCategories is list) &&
+             (!('accounts' in data) || data.accounts is list) &&
+             (!('nightShiftBonusPercent' in data) || data.nightShiftBonusPercent is number) &&
+             (!('nightShiftBonusType' in data) || (data.nightShiftBonusType is string && data.nightShiftBonusType in ['percent', 'fixed'])) &&
+             (!('nightShiftBonusValue' in data) || data.nightShiftBonusValue is number) &&
+             (!('shiftColor' in data) || (data.shiftColor is string && data.shiftColor.size() <= 20)) &&
+             (!('googleEventColor' in data) || (data.googleEventColor is string && data.googleEventColor.size() <= 20)) &&
+             (!('autoSyncGoogleCalendar' in data) || data.autoSyncGoogleCalendar is bool) &&
+             (!('defaultHolidayMultiplier' in data) || data.defaultHolidayMultiplier is number) &&
+             (!('autoDetectHolidays' in data) || data.autoDetectHolidays is bool) &&
+             (!('payrollCutoffDate' in data) || data.payrollCutoffDate is number) &&
+             (!('paydayDate' in data) || data.paydayDate is number) &&
+             data.updatedAt is string;
+    }
+
+    function isValidShift(data) {
+      return data.keys().hasAll(['date', 'startTime', 'endTime', 'hourlyRate', 'hoursWorked', 'totalPay', 'createdAt']) &&
+             data.date is string && data.date.size() <= 10 &&
+             data.startTime is string && data.startTime.size() <= 5 &&
+             data.endTime is string && data.endTime.size() <= 5 &&
+             data.hourlyRate is number &&
+             data.hoursWorked is number &&
+             data.totalPay is number &&
+             (!('isHoliday' in data) || data.isHoliday is bool) &&
+             (!('holidayMultiplier' in data) || data.holidayMultiplier is number) &&
+             (!('holidayName' in data) || (data.holidayName is string && data.holidayName.size() <= 100)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('color' in data) || (data.color is string && data.color.size() <= 20)) &&
+             (!('googleEventId' in data) || (data.googleEventId is string && data.googleEventId.size() <= 256)) &&
+             (!('regularHours' in data) || data.regularHours is number) &&
+             (!('bonusHours' in data) || data.bonusHours is number) &&
+             (!('updatedAt' in data) || data.updatedAt is string) &&
+             (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+             (!('syncedToCalendar' in data) || data.syncedToCalendar is bool) &&
+             data.createdAt is string;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['date', 'type', 'amount', 'description', 'createdAt']) &&
+             data.date is string && data.date.size() <= 10 &&
+             data.type is string && data.type in ['income', 'expense'] &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
+             (!('account' in data) || (data.account is string && data.account.size() <= 100)) &&
+             data.amount is number &&
+             data.description is string && data.description.size() <= 200 &&
+             (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+             data.createdAt is string;
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+                    isValidId(userId) &&
+                    isValidUserSettings(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+                    isValidId(userId) &&
+                    isValidUserSettings(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['defaultHourlyRate', 'currency', 'updatedAt', 'shiftTemplates', 'expenseCategories', 'accounts', 'nightShiftBonusPercent', 'nightShiftBonusType', 'nightShiftBonusValue', 'shiftColor', 'googleEventColor', 'autoSyncGoogleCalendar', 'defaultHolidayMultiplier', 'autoDetectHolidays', 'payrollCutoffDate', 'paydayDate']);
+      allow delete: if false;
+
+      match /shifts/{shiftId} {
+        allow read: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+        allow create: if isSignedIn() && request.auth.uid == userId &&
+                      isValidId(userId) && isValidId(shiftId) &&
+                      isValidShift(incoming());
+        allow update: if isSignedIn() && request.auth.uid == userId &&
+                      isValidId(userId) && isValidId(shiftId) &&
+                      isValidShift(incoming()) &&
+                      incoming().createdAt == existing().createdAt &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['date', 'startTime', 'endTime', 'hourlyRate', 'notes', 'hoursWorked', 'regularHours', 'bonusHours', 'totalPay', 'updatedAt', 'syncedToCalendar', 'id', 'color', 'googleEventId', 'isHoliday', 'holidayMultiplier', 'holidayName']);
+        allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(shiftId);
+      }
+
+      match /transactions/{transactionId} {
+        allow read: if isSignedIn() && request.auth.uid == userId && isValidId(userId);
+        allow create: if isSignedIn() && request.auth.uid == userId &&
+                      isValidId(userId) && isValidId(transactionId) &&
+                      isValidTransaction(incoming());
+        allow update: if false;
+        allow delete: if isSignedIn() && request.auth.uid == userId && isValidId(userId) && isValidId(transactionId);
+      }
+    }
+  }
+}
